@@ -11,3 +11,4 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = "1.0.65"
 num = "0.4.0"
+thiserror = "1.0.37"
