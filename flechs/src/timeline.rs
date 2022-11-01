@@ -1,4 +1,12 @@
+use crate::{
+    time::TimeUnit,
+    util::{lower_bound, upper_bound},
+};
+
+use std::iter::zip;
+
 /// Represents a item timeline.
+#[derive(Debug, Clone)]
 pub struct Timeline<U, V> {
     times: Vec<U>,
     items: Vec<V>,
@@ -6,7 +14,7 @@ pub struct Timeline<U, V> {
 
 impl<U, V> Timeline<U, V>
 where
-    U: PartialOrd,
+    U: TimeUnit,
 {
     /// Creates empty timeline.
     pub fn new() -> Timeline<U, V> {
@@ -17,13 +25,18 @@ where
     }
 
     /// Returns iterator of times.
-    pub fn times(&self) -> impl Iterator<Item = &U> {
-        self.times.iter()
+    pub fn times(&self) -> impl Iterator<Item = U> + '_ {
+        self.times.iter().copied()
     }
 
     /// Returns iterator of items.
     pub fn items(&self) -> impl Iterator<Item = &V> {
         self.items.iter()
+    }
+
+    /// Consumes itself and returns pair iterator.
+    pub fn into_pairs(self) -> impl Iterator<Item = (U, V)> {
+        zip(self.times, self.items)
     }
 
     /// Appends a new item pair.
@@ -48,8 +61,8 @@ where
     }
 
     /// Gets latest item.
-    pub fn latest_item(&self, time: &U) -> Option<&V> {
-        let left = upper_bound(&self.times, time);
+    pub fn latest_item(&self, time: U) -> Option<&V> {
+        let left = upper_bound(&self.times, &time);
         if left > 0 {
             Some(&self.items[left - 1])
         } else {
@@ -58,8 +71,8 @@ where
     }
 
     /// Gets latest time items slice.
-    pub fn latest_slice(&self, time: &U) -> &[V] {
-        let left = lower_bound(&self.times, time);
+    pub fn latest_slice(&self, time: U) -> &[V] {
+        let left = lower_bound(&self.times, &time);
         if let Some(latest_time) = self.times.get(left) {
             let right = upper_bound(&self.times, latest_time);
             &self.items[left..right]
@@ -67,35 +80,6 @@ where
             &self.items[left..left]
         }
     }
-}
-
-/// Searches lower bound index for specified time.
-pub fn lower_bound<T: PartialOrd>(target: &[T], item: &T) -> usize {
-    let mut search_range = 0..(target.len());
-    while search_range.len() > 0 {
-        let mid = search_range.len() / 2 + search_range.start;
-        search_range = if item <= &target[mid] {
-            (search_range.start)..mid
-        } else {
-            (mid + 1)..(search_range.end)
-        };
-    }
-
-    search_range.start
-}
-
-/// Searches upper bound index for specified time.
-pub fn upper_bound<T: PartialOrd>(target: &[T], item: &T) -> usize {
-    let mut search_range = 0..(target.len());
-    while search_range.len() > 0 {
-        let mid = search_range.len() / 2 + search_range.start;
-        search_range = if item < &target[mid] {
-            (search_range.start)..mid
-        } else {
-            (mid + 1)..(search_range.end)
-        };
-    }
-    search_range.start
 }
 
 #[macro_export]
@@ -109,49 +93,20 @@ macro_rules! timeline {
             tl
         }
     );
+    { $( [ $t:expr ] : $v:expr , )* } => (
+        {
+            let mut tl = $crate::timeline::Timeline::new();
+            $(
+                tl.append($t, $v);
+            )*
+            tl
+        }
+    );
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{lower_bound, upper_bound};
     use crate::instant;
-
-    #[test]
-    fn bound_functions_work() {
-        let source = vec![1, 2, 4, 8, 16, 32, 64, 128];
-        assert_eq!(lower_bound(&source, &1), 0);
-        assert_eq!(lower_bound(&source, &2), 1);
-        assert_eq!(lower_bound(&source, &3), 2);
-        assert_eq!(lower_bound(&source, &4), 2);
-        assert_eq!(lower_bound(&source, &20), 5);
-        assert_eq!(lower_bound(&source, &256), 8);
-
-        let source = vec![1, 1, 1, 1, 16, 16, 16, 16, 256];
-        assert_eq!(lower_bound(&source, &0), 0);
-        assert_eq!(lower_bound(&source, &1), 0);
-        assert_eq!(lower_bound(&source, &2), 4);
-        assert_eq!(lower_bound(&source, &15), 4);
-        assert_eq!(lower_bound(&source, &16), 4);
-        assert_eq!(lower_bound(&source, &17), 8);
-        assert_eq!(lower_bound(&source, &512), 9);
-
-        let source = vec![1, 2, 4, 8, 16, 32, 64, 128];
-        assert_eq!(upper_bound(&source, &1), 1);
-        assert_eq!(upper_bound(&source, &2), 2);
-        assert_eq!(upper_bound(&source, &3), 2);
-        assert_eq!(upper_bound(&source, &4), 3);
-        assert_eq!(upper_bound(&source, &20), 5);
-        assert_eq!(upper_bound(&source, &256), 8);
-
-        let source = vec![1, 1, 1, 1, 16, 16, 16, 16, 256];
-        assert_eq!(upper_bound(&source, &0), 0);
-        assert_eq!(upper_bound(&source, &1), 4);
-        assert_eq!(upper_bound(&source, &2), 4);
-        assert_eq!(upper_bound(&source, &15), 4);
-        assert_eq!(upper_bound(&source, &16), 8);
-        assert_eq!(upper_bound(&source, &17), 8);
-        assert_eq!(upper_bound(&source, &512), 9);
-    }
 
     #[test]
     fn basic_timeline_works() {
@@ -161,22 +116,22 @@ mod tests {
         };
 
         assert_eq!(
-            tl.latest_item(&instant![0:0/1]),
+            tl.latest_item(instant![0:0/1]),
             Some(&7),
             "timeline fetches correct item"
         );
         assert_eq!(
-            tl.latest_item(&instant![2:3/4]),
+            tl.latest_item(instant![2:3/4]),
             Some(&7),
             "timeline fetches correct item"
         );
         assert_eq!(
-            tl.latest_item(&instant![7:0/1]),
+            tl.latest_item(instant![7:0/1]),
             Some(&4),
             "timeline fetches correct item"
         );
         assert_eq!(
-            tl.latest_item(&instant![100:0/1]),
+            tl.latest_item(instant![100:0/1]),
             Some(&4),
             "timeline fetches correct item"
         );

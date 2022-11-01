@@ -1,7 +1,12 @@
 //! Basic time structs.
 
-use num::rational::Ratio;
+use num::{rational::Ratio, Integer};
 use thiserror::Error as ThisError;
+
+/// Indicates that this type can be used as time unit in flechs.
+pub trait TimeUnit: PartialOrd + Copy {}
+
+impl<N> TimeUnit for N where N: Copy + Integer {}
 
 /// Represents a paticular instant time in chart/score.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -12,6 +17,8 @@ pub struct Instant {
     /// time in measure.
     submeasure: Ratio<usize>,
 }
+
+impl TimeUnit for Instant {}
 
 /// Represents an error about `Instant`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ThisError)]
