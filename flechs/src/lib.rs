@@ -2,5 +2,6 @@
 
 pub mod hs;
 pub mod time;
+pub mod timeline;
 
 pub use time::Instant;

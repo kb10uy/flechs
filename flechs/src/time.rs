@@ -22,6 +22,7 @@ pub enum InstantError {
 }
 
 impl Instant {
+    /// Creates new instant.
     pub fn new(measure: usize, submeasure: Ratio<usize>) -> Result<Instant, InstantError> {
         if submeasure >= Ratio::new(1, 1) {
             Err(InstantError::OverSubmeasure(submeasure))
@@ -30,6 +31,18 @@ impl Instant {
                 measure,
                 submeasure,
             })
+        }
+    }
+
+    /// Creates new instant with parts.
+    pub const fn new_parts(measure: usize, sub_numer: usize, sub_denom: usize) -> Instant {
+        if sub_denom == 0 || sub_numer >= sub_denom {
+            panic!("invalid submeasure");
+        } else {
+            Instant {
+                measure,
+                submeasure: Ratio::new_raw(sub_numer, sub_denom),
+            }
         }
     }
 
@@ -42,6 +55,14 @@ impl Instant {
     }
 }
 
+/// Constructs an `Instant` in const context.
+#[macro_export]
+macro_rules! instant {
+    [$m:literal : $sn:literal / $sd:literal] => {
+        $crate::time::Instant::new_parts($m, $sn, $sd)
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Instant, InstantError};
@@ -51,24 +72,16 @@ mod tests {
     #[test]
     fn instant_validation_works() {
         assert!(
-            Instant::new(0, Ratio::new(0, 0)).is_ok(),
-            "Valid Instant does not pass"
-        );
-        assert!(
-            Instant::new(1, Ratio::new(0, 0)).is_ok(),
-            "Valid Instant does not pass"
+            Instant::new(0, Ratio::new(0, 1)).is_ok(),
+            "Valid Instant pass"
         );
         assert!(
             Instant::new(2, Ratio::new(1, 4)).is_ok(),
-            "Valid Instant does not pass"
-        );
-        assert!(
-            Instant::new(2, Ratio::new(3, 4)).is_ok(),
-            "Valid Instant does not pass"
+            "Valid Instant pass"
         );
         assert!(
             Instant::new(2, Ratio::new(15, 16)).is_ok(),
-            "Valid Instant does not pass"
+            "Valid Instant pass"
         );
 
         assert_eq!(
@@ -78,8 +91,20 @@ mod tests {
         );
         assert_eq!(
             Instant::new(0, Ratio::new(8, 4)),
-            Err(InstantError::OverSubmeasure(Ratio::new(4, 4))),
+            Err(InstantError::OverSubmeasure(Ratio::new(8, 4))),
             "Invalid instant passes"
         );
+    }
+
+    #[test]
+    fn instant_macro_works() {
+        assert_eq!(instant![0:0/1].measure, 0, "Instant macro works");
+        assert_eq!(instant![1:3/4].measure, 1, "Instant macro works");
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid submeasure")]
+    fn invalid_instant_macro_panicks() {
+        instant![0:1/1];
     }
 }
