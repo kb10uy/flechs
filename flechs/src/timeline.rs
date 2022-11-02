@@ -3,7 +3,16 @@ use crate::{
     util::{lower_bound, upper_bound},
 };
 
-use std::iter::zip;
+use std::{cmp::Ordering, iter::zip};
+
+use thiserror::Error as ThisError;
+
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+pub enum TimelineError {
+    /// Timelines with duplicate times are to merge.
+    #[error("merging timelines that have duplicate times")]
+    HasDuplicateTimes,
+}
 
 /// Represents a item timeline.
 #[derive(Debug, Clone)]
@@ -80,6 +89,87 @@ where
             &self.items[left..left]
         }
     }
+
+    /// Returns whether this timeline has duplicate time steps.
+    pub fn has_duplicate_times(&self) -> bool {
+        let mut times = self.times();
+        let mut last_time = match times.next() {
+            Some(t) => t,
+            None => return false,
+        };
+        // MEMO: try_fold() may be used
+        for time in times {
+            if time == last_time {
+                return true;
+            }
+            last_time = time;
+        }
+        false
+    }
+
+    /// Merges two timeline into one timeline of tuples.
+    pub fn merge<W>(
+        self,
+        right: Timeline<U, W>,
+    ) -> Result<Timeline<U, (Option<V>, Option<W>)>, TimelineError> {
+        if self.has_duplicate_times() || right.has_duplicate_times() {
+            return Err(TimelineError::HasDuplicateTimes);
+        }
+        let mut left_pairs = self.into_pairs();
+        let mut right_pairs = right.into_pairs();
+        let mut last_left = left_pairs.next();
+        let mut last_right = right_pairs.next();
+
+        let mut tl = Timeline::new();
+        loop {
+            match (last_left, last_right) {
+                (Some((lt, li)), Some((rt, ri))) => {
+                    match lt.partial_cmp(&rt).expect("not supported") {
+                        Ordering::Less => {
+                            tl.append(lt, (Some(li), None));
+                            last_left = left_pairs.next();
+                            last_right = Some((rt, ri));
+                        }
+                        Ordering::Equal => {
+                            tl.append(lt, (Some(li), Some(ri)));
+                            last_left = left_pairs.next();
+                            last_right = right_pairs.next();
+                        }
+                        Ordering::Greater => {
+                            tl.append(rt, (None, Some(ri)));
+                            last_left = Some((lt, li));
+                            last_right = right_pairs.next();
+                        }
+                    }
+                }
+                (Some((lt, li)), None) => {
+                    tl.append(lt, (Some(li), None));
+                    last_left = left_pairs.next();
+                    last_right = None;
+                }
+                (None, Some((rt, ri))) => {
+                    tl.append(rt, (None, Some(ri)));
+                    last_left = None;
+                    last_right = right_pairs.next();
+                }
+                (None, None) => break,
+            }
+        }
+        Ok(tl)
+    }
+}
+
+impl<U, V> FromIterator<(U, V)> for Timeline<U, V>
+where
+    U: TimeUnit,
+{
+    fn from_iter<T: IntoIterator<Item = (U, V)>>(iter: T) -> Self {
+        let mut tl = Timeline::new();
+        for (time, item) in iter {
+            tl.append(time, item);
+        }
+        tl
+    }
 }
 
 #[macro_export]
@@ -135,5 +225,10 @@ mod tests {
             Some(&4),
             "timeline fetches correct item"
         );
+    }
+
+    #[test]
+    fn advanced_timeline_works() {
+        // TODO: write test
     }
 }
