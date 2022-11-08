@@ -5,6 +5,7 @@ use num::{rational::Ratio, Zero};
 use crate::{preintegral::Integrable, time::Instant};
 
 /// Represents beat event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Beat(pub Ratio<usize>);
 
 impl Integrable<usize> for Beat {
@@ -24,5 +25,5 @@ impl Integrable<usize> for Beat {
 }
 
 /// Represents tempo event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Tempo(pub Ratio<usize>);
-
