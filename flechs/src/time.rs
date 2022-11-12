@@ -1,12 +1,12 @@
 //! Basic time structs.
 
-use num::{rational::Ratio, Integer};
+use num::{rational::Ratio, Integer, Zero};
 use thiserror::Error as ThisError;
 
 /// Indicates that this type can be used as time unit in flechs.
 pub trait TimeUnit: PartialOrd + Copy {}
 
-impl<N> TimeUnit for N where N: Copy + Integer {}
+impl<N> TimeUnit for N where N: Copy + Integer + Zero {}
 
 /// Represents a paticular instant time in chart/score.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -29,6 +29,14 @@ pub enum InstantError {
 }
 
 impl Instant {
+    /// Returns zero.
+    pub const fn zero() -> Instant {
+        Instant {
+            measure: 0,
+            submeasure: Ratio::new_raw(0, 1),
+        }
+    }
+
     /// Creates new instant.
     pub fn new(measure: usize, submeasure: Ratio<usize>) -> Result<Instant, InstantError> {
         if submeasure >= Ratio::new(1, 1) {

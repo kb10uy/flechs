@@ -12,6 +12,10 @@ pub enum TimelineError {
     /// Timelines with duplicate times are to merge.
     #[error("merging timelines that have duplicate times")]
     HasDuplicateTimes,
+
+    /// Timeline requires zero alignment.
+    #[error("zero align required")]
+    NotZeroAligned,
 }
 
 /// Represents a item timeline.
